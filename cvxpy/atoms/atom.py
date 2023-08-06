@@ -20,6 +20,7 @@ if TYPE_CHECKING:
     from cvxpy.constraints.constraint import Constraint
 
 import numpy as np
+import numpy.typing as npt
 
 import cvxpy.lin_ops.lin_op as lo
 import cvxpy.lin_ops.lin_utils as lu
@@ -435,6 +436,11 @@ class Atom(Expression):
         Returns:
             A list of SciPy CSC sparse matrices or None.
         """
+        raise NotImplementedError()
+
+    @abc.abstractmethod
+    def nondiff(self, point: float | npt.ArrayLike | None) -> bool:
+        """Checks if the function is differentiable at `point`"""
         raise NotImplementedError()
 
     @property

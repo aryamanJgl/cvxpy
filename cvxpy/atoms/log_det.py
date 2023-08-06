@@ -17,12 +17,14 @@ limitations under the License.
 from typing import List, Tuple
 
 import numpy as np
+import numpy.typing as npt
 import scipy.sparse as sp
 from numpy import linalg as LA
 
 import cvxpy.settings as s
 from cvxpy.atoms.atom import Atom
 from cvxpy.constraints.constraint import Constraint
+from cvxpy.tests.base_test import BaseTest
 
 
 class log_det(Atom):
@@ -103,6 +105,14 @@ class log_det(Atom):
         # Outside domain.
         else:
             return [None]
+
+    def nondiff(self, point: float | npt.ArrayLike) -> bool:
+        """Checks if the function is differentiable at `point`"""
+        t = BaseTest()
+        if t.assertAlmostEqual(np.linalg.det(point), 0):
+            return False
+        else:
+            return True
 
     def _domain(self) -> List[Constraint]:
         """Returns constraints describing the domain of the node.

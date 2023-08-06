@@ -16,8 +16,12 @@ limitations under the License.
 from typing import List, Tuple
 
 import numpy as np
+import numpy.typing as npt
+import cvxpy as cp
 import scipy.sparse as sp
 from scipy import linalg as LA
+
+from cvxpy.tests.base_test import BaseTest
 
 from cvxpy.atoms.atom import Atom
 from cvxpy.constraints.constraint import Constraint
@@ -60,6 +64,15 @@ class lambda_max(Atom):
         d = np.diag(d)
         D = v.dot(d).dot(v.T)
         return [sp.csc_matrix(D.ravel(order='F')).T]
+
+    def nondiff(self, point: float | npt.ArrayLike | None = None) -> bool:
+        """Checks if the function is differentiable at `point`"""
+        second_largest = cp.lambda_sum_largest(self.args[0], 2) - cp.lambda_max(self.args[0])
+        t = BaseTest()
+        if t.assertAlmostEqual(cp.lambda_max(self.args[0]), second_largest, places=4):
+            return True
+        else:
+            return False
 
     def validate_arguments(self) -> None:
         """Verify that the argument A is square.
