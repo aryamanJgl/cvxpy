@@ -17,13 +17,11 @@ limitations under the License.
 from typing import Tuple
 
 import numpy as np
-import numpy.typing as npt
-import cvxpy as cp
 import scipy.sparse as sp
+from cvxpy.expressions import cvxtypes
 
 import cvxpy.interface as intf
 from cvxpy.atoms.atom import Atom
-from cvxpy.tests.base_test import BaseTest
 
 
 class sum_largest(Atom):
@@ -66,16 +64,14 @@ class sum_largest(Atom):
         D[indices] = 1
         return [sp.csc_matrix(D)]
 
-    def nondiff(self, point: float | npt.ArrayLike | None = None) -> bool:
+    @staticmethod
+    def is_differentiable_at(point: cvxtypes.constant() | cvxtypes.variable(), k: int) -> bool:
         """Checks if the function is differentiable at `point`"""
-        top_k = []
-        for i in range(2, self.k + 1):
-            top_k.append(cp.sum_largest(self.args[0], i) - cp.sum_largest(self.args[0], i - 1))
-        t = BaseTest()
-        if t.assertItemsAlmostEqual(top_k, [top_k[0] for i in range(self.k)], places=4):
-            return True
-        else:
+        point_top_k = -np.sort(-point.flatten().value)[: k]
+        if len(point_top_k != set(point_top_k)):
             return False
+        else:
+            return True
 
     def shape_from_args(self) -> Tuple[int, ...]:
         """Returns the (row, col) shape of the expression.

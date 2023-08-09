@@ -17,15 +17,14 @@ limitations under the License.
 from typing import List, Tuple
 
 import numpy as np
-import numpy.typing as npt
+
 import scipy.sparse as sp
 from numpy import linalg as LA
+from cvxpy.expressions import cvxtypes
 
 import cvxpy.settings as s
 from cvxpy.atoms.atom import Atom
 from cvxpy.constraints.constraint import Constraint
-from cvxpy.tests.base_test import BaseTest
-
 
 class log_det(Atom):
     """:math:`\\log\\det A`
@@ -106,10 +105,10 @@ class log_det(Atom):
         else:
             return [None]
 
-    def nondiff(self, point: float | npt.ArrayLike) -> bool:
+    @staticmethod
+    def is_differentiable_at(point: cvxtypes.constant() | cvxtypes.variable()) -> bool:
         """Checks if the function is differentiable at `point`"""
-        t = BaseTest()
-        if t.assertAlmostEqual(np.linalg.det(point), 0):
+        if np.allclose(np.linalg.det(point.value), 0, atol=1e4, rtol=1e9):
             return False
         else:
             return True

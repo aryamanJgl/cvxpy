@@ -438,8 +438,9 @@ class Atom(Expression):
         """
         raise NotImplementedError()
 
+    @staticmethod
     @abc.abstractmethod
-    def nondiff(self, point: float | npt.ArrayLike | None) -> bool:
+    def is_differentiable_at(point: float | npt.ArrayLike | None) -> bool:
         """Checks if the function is differentiable at `point`"""
         raise NotImplementedError()
 
