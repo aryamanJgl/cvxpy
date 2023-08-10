@@ -17,6 +17,9 @@ limitations under the License.
 from typing import Tuple
 
 import numpy as np
+import cvxpy as cp
+
+from cvxpy.expressions import cvxtypes
 
 from .elementwise import Elementwise
 
@@ -83,3 +86,12 @@ class abs(Elementwise):
         D += (values[0] > 0)
         D -= (values[0] < 0)
         return [abs.elemwise_grad_to_diag(D, rows, cols)]
+
+    @staticmethod
+    def is_differentiable_at(point: cvxtypes.constant() | cvxtypes.variable()) -> bool:
+        """Checks if the function is differentiable at `point`"""
+        f = lambda x: np.isclose(0, x, rtol=1e9, atol=1e4)
+        if np.any(f(point.value)):
+            return False
+        else:
+            return True

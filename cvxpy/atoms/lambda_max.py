@@ -68,7 +68,7 @@ class lambda_max(Atom):
         """Checks if the function is differentiable at `point`"""
         largest = cp.lambda_max(point)
         second_largest = cp.lambda_sum_largest(point, 2) - largest
-        if np.allclose(largest.value, second_largest.value, rtol=1e4, atol=1e9):
+        if np.allclose(largest.value, second_largest.value, rtol=1e8, atol=1e4):
             return True
         else:
             return False

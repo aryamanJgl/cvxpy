@@ -20,6 +20,7 @@ from typing import Any, List, Tuple
 import numpy as np
 
 from cvxpy.atoms.elementwise.elementwise import Elementwise
+from cvxpy.expressions import cvxtypes
 
 if sys.version_info >= (3, 0):
     from functools import reduce
@@ -112,3 +113,12 @@ class maximum(Elementwise):
             grad_list += [maximum.elemwise_grad_to_diag(grad_vals,
                                                         rows, cols)]
         return grad_list
+
+    @staticmethod
+    def is_differentiable_at(point1: cvxtypes.constant() | cvxtypes.variable(),
+                             point2: cvxtypes.constant() | cvxtypes.variable()) -> bool:
+        """Checks if the function is differentiable at `point`"""
+        if np.allclose(point1.value, point2.value):
+            return False
+        else:
+            return True
