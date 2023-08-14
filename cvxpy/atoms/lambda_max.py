@@ -22,6 +22,7 @@ from scipy import linalg as LA
 
 from cvxpy.atoms.atom import Atom
 from cvxpy.constraints.constraint import Constraint
+from cvxpy.error import NotDifferentiableError
 from cvxpy.expressions import cvxtypes
 
 
@@ -56,15 +57,17 @@ class lambda_max(Atom):
         Returns:
             A list of SciPy CSC sparse matrices or None.
         """
-        w, v = LA.eigh(values[0])
-        d = np.zeros(w.shape)
-        d[-1] = 1
-        d = np.diag(d)
-        D = v.dot(d).dot(v.T)
-        return [sp.csc_matrix(D.ravel(order='F')).T]
+        if self._is_differentiable_at(values[0]):
+            w, v = LA.eigh(values[0])
+            d = np.zeros(w.shape)
+            d[-1] = 1
+            d = np.diag(d)
+            D = v.dot(d).dot(v.T)
+            return [sp.csc_matrix(D.ravel(order='F')).T]
+        else:
+            raise NotDifferentiableError
 
-    @staticmethod
-    def is_differentiable_at(point: cvxtypes.constant() | cvxtypes.variable()) -> bool:
+    def _is_differentiable_at(self, point: cvxtypes.constant() | cvxtypes.variable()) -> bool:
         """Checks if the function is differentiable at `point`"""
         largest = cp.lambda_max(point)
         second_largest = cp.lambda_sum_largest(point, 2) - largest

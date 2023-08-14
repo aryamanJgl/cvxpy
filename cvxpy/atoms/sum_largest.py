@@ -18,6 +18,7 @@ from typing import Tuple
 
 import numpy as np
 import scipy.sparse as sp
+from cvxpy.error import NotDifferentiableError
 from cvxpy.expressions import cvxtypes
 
 import cvxpy.interface as intf
@@ -58,14 +59,16 @@ class sum_largest(Atom):
             A list of SciPy CSC sparse matrices or None.
         """
         # Grad: 1 for each of k largest indices.
-        value = intf.from_2D_to_1D(values[0].flatten().T)
-        indices = np.argsort(-value)[:int(self.k)]
-        D = np.zeros((self.args[0].shape[0]*self.args[0].shape[1], 1))
-        D[indices] = 1
-        return [sp.csc_matrix(D)]
+        if self._is_differentiable_at(values[0]):
+            value = intf.from_2D_to_1D(values[0].flatten().T)
+            indices = np.argsort(-value)[:int(self.k)]
+            D = np.zeros((self.args[0].shape[0]*self.args[0].shape[1], 1))
+            D[indices] = 1
+            return [sp.csc_matrix(D)]
+        else:
+            raise NotDifferentiableError
 
-    @staticmethod
-    def is_differentiable_at(point: cvxtypes.constant() | cvxtypes.variable(), k: int) -> bool:
+    def _is_differentiable_at(self, point: cvxtypes.constant() | cvxtypes.variable(), k: int) -> bool:
         """Checks if the function is differentiable at `point`"""
         point_top_k = -np.sort(-point.flatten().value)[: k]
         if len(point_top_k != set(point_top_k)):

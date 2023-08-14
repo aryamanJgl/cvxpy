@@ -17,7 +17,7 @@ limitations under the License.
 from typing import Tuple
 
 import numpy as np
-import cvxpy as cp
+from cvxpy.error import NotDifferentiableError
 
 from cvxpy.expressions import cvxtypes
 
@@ -80,15 +80,17 @@ class abs(Elementwise):
             A list of SciPy CSC sparse matrices or None.
         """
         # Grad: +1 if positive, -1 if negative.
-        rows = self.expr.size
-        cols = self.size
-        D = np.zeros(self.expr.shape)
-        D += (values[0] > 0)
-        D -= (values[0] < 0)
-        return [abs.elemwise_grad_to_diag(D, rows, cols)]
+        if self._is_differentiable_at(values[0]):
+            rows = self.expr.size
+            cols = self.size
+            D = np.zeros(self.expr.shape)
+            D += (values[0] > 0)
+            D -= (values[0] < 0)
+            return [abs.elemwise_grad_to_diag(D, rows, cols)]
+        else:
+            raise NotDifferentiableError
 
-    @staticmethod
-    def is_differentiable_at(point: cvxtypes.constant() | cvxtypes.variable()) -> bool:
+    def _is_differentiable_at(self, point: cvxtypes.constant() | cvxtypes.variable()) -> bool:
         """Checks if the function is differentiable at `point`"""
         f = lambda x: np.isclose(0, x, rtol=1e9, atol=1e4)
         if np.any(f(point.value)):

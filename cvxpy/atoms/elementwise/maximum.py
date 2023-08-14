@@ -20,6 +20,7 @@ from typing import Any, List, Tuple
 import numpy as np
 
 from cvxpy.atoms.elementwise.elementwise import Elementwise
+from cvxpy.error import NotDifferentiableError
 from cvxpy.expressions import cvxtypes
 
 if sys.version_info >= (3, 0):
@@ -101,21 +102,23 @@ class maximum(Elementwise):
         Returns:
             A list of SciPy CSC sparse matrices or None.
         """
-        max_vals = self.numeric(values)
-        unused = np.ones(max_vals.shape, dtype=bool)
-        grad_list = []
-        for idx, value in enumerate(values):
-            rows = self.args[idx].size
-            cols = self.size
-            grad_vals = (value == max_vals) & unused
-            # Remove all the max_vals that were used.
-            unused[value == max_vals] = 0
-            grad_list += [maximum.elemwise_grad_to_diag(grad_vals,
-                                                        rows, cols)]
-        return grad_list
+        if self._is_differentiable_at(values[0], values[1]):
+            max_vals = self.numeric(values)
+            unused = np.ones(max_vals.shape, dtype=bool)
+            grad_list = []
+            for idx, value in enumerate(values):
+                rows = self.args[idx].size
+                cols = self.size
+                grad_vals = (value == max_vals) & unused
+                # Remove all the max_vals that were used.
+                unused[value == max_vals] = 0
+                grad_list += [maximum.elemwise_grad_to_diag(grad_vals,
+                                                            rows, cols)]
+            return grad_list
+        else:
+            raise NotDifferentiableError
 
-    @staticmethod
-    def is_differentiable_at(point1: cvxtypes.constant() | cvxtypes.variable(),
+    def _is_differentiable_at(self, point1: cvxtypes.constant() | cvxtypes.variable(),
                              point2: cvxtypes.constant() | cvxtypes.variable()) -> bool:
         """Checks if the function is differentiable at `point`"""
         if np.allclose(point1.value, point2.value):
