@@ -68,10 +68,10 @@ class sum_largest(Atom):
         else:
             raise NotDifferentiableError
 
-    def _is_differentiable_at(self, point: cvxtypes.constant() | cvxtypes.variable(), k: int) -> bool:
+    def _is_differentiable_at(self, point: cvxtypes.constant() | cvxtypes.variable()) -> bool:
         """Checks if the function is differentiable at `point`"""
-        point_top_k = -np.sort(-point.flatten().value)[: k]
-        if len(point_top_k != set(point_top_k)):
+        point_top_k = -np.sort(-point.flatten().value)[: self.k]
+        if len(point_top_k) != len(set(point_top_k)):
             return False
         else:
             return True

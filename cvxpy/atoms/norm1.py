@@ -16,10 +16,13 @@ limitations under the License.
 from typing import List, Tuple
 
 import numpy as np
+import cvxpy as cp
 import scipy.sparse as sp
 
 from cvxpy.atoms.axis_atom import AxisAtom
 from cvxpy.constraints.constraint import Constraint
+from cvxpy.error import NotDifferentiableError
+from cvxpy.expressions import cvxtypes
 
 
 class norm1(AxisAtom):
@@ -102,9 +105,23 @@ class norm1(AxisAtom):
         Returns:
             A NumPy ndarray matrix or None.
         """
-        rows = value.size
-        D_null = sp.csc_matrix((rows, 1), dtype='float64')
-        value = value.reshape((rows, 1))
-        D_null += (value > 0)
-        D_null -= (value < 0)
-        return D_null
+        if self._is_differentiable_at(value):
+            rows = value.size
+            D_null = sp.csc_matrix((rows, 1), dtype='float64')
+            value = value.reshape((rows, 1))
+            D_null += (value > 0)
+            D_null -= (value < 0)
+            return D_null
+        else:
+            raise NotDifferentiableError
+
+    def _is_differentiable_at(self, point: cvxtypes.constant() | cvxtypes.variable()) -> bool:
+        """Checks if the function is differentiable at `point`"""
+        if self.axis is not None:
+            axis_norm = cp.norm1(point, axis=self.axis).value,
+            if np.allclose(axis_norm, np.zeros_like(axis_norm)):
+                return False
+            else:
+                return True
+        else:
+           np.isclose(cp.norm1(point).value, 0)

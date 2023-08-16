@@ -16,9 +16,11 @@ limitations under the License.
 from typing import Optional, Tuple
 
 import numpy as np
+import cvxpy as cp
 
 from cvxpy.atoms.atom import Atom
 from cvxpy.atoms.axis_atom import AxisAtom
+from cvxpy.error import NotDifferentiableError
 from cvxpy.expressions import cvxtypes
 
 
@@ -72,11 +74,35 @@ class max(AxisAtom):
             A NumPy ndarray or None.
         """
         # Grad: 1 for a largest index.
-        value = np.array(value).ravel(order='F')
-        idx = np.argmax(value)
-        D = np.zeros((value.size, 1))
-        D[idx] = 1
-        return D
+        if self._is_differentiable_at(value):
+            value = np.array(value).ravel(order='F')
+            idx = np.argmax(value)
+            D = np.zeros((value.size, 1))
+            D[idx] = 1
+            return D
+        else:
+            raise NotDifferentiableError
+
+    def _is_differentiable_at(self, point: cvxtypes.constant() | cvxtypes.variable()) -> bool:
+        """Checks if the function is differentiable at `point`"""
+        if self.axis is not None:
+            largest_vector = cp.max(point, axis=self.axis)
+            f = lambda x: np.allclose(largest_vector.value, x.value)
+            if self.axis == 1:
+                t_value = list(np.apply_along_axis(f, axis=0, arr=point.value))
+            else:
+                t_value = list(np.apply_along_axis(f, axis=1, arr=point.value))
+            if t_value.count(True) > 1:
+                return False
+            else:
+                return True
+        else:
+            largest = cp.max(point)
+            second_largest = cp.sum_largest(point, 2) - largest
+            if np.allclose(largest.value, second_largest.value, rtol=1e8, atol=1e4):
+                return True
+            else:
+                return False
 
     def sign_from_args(self) -> Tuple[bool, bool]:
         """Returns sign (is positive, is negative) of the expression.

@@ -17,9 +17,12 @@ limitations under the License.
 from typing import Tuple
 
 import numpy as np
+import cvxpy as cp
 import scipy.sparse as sp
 
 from cvxpy.atoms.atom import Atom
+from cvxpy.error import NotDifferentiableError
+from cvxpy.expressions import cvxtypes
 
 
 class normNuc(Atom):
@@ -47,9 +50,19 @@ class normNuc(Atom):
             A list of SciPy CSC sparse matrices or None.
         """
         # Grad UV^T
-        U, _, V = np.linalg.svd(values[0])
-        D = U.dot(V)
-        return [sp.csc_matrix(D.ravel(order='F')).T]
+        if self._is_differentiable_at(values[0]):
+            U, _, V = np.linalg.svd(values[0])
+            D = U.dot(V)
+            return [sp.csc_matrix(D.ravel(order='F')).T]
+        else:
+            raise NotDifferentiableError
+
+    def _is_differentiable_at(self, point: cvxtypes.constant() | cvxtypes.variable()) -> bool:
+        """Checks if the function is differentiable at `point`"""
+        if np.isclose(cp.normNuc(point).value, 0):
+            return False
+        else:
+            return True
 
     def shape_from_args(self) -> Tuple[int, ...]:
         """Returns the (row, col) shape of the expression.

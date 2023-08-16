@@ -17,10 +17,13 @@ limitations under the License.
 from typing import Tuple
 
 import numpy as np
+import cvxpy as cp
 import scipy.sparse as sp
 from numpy import linalg as LA
 
 from cvxpy.atoms.atom import Atom
+from cvxpy.error import NotDifferentiableError
+from cvxpy.expressions import cvxtypes
 
 
 class sigma_max(Atom):
@@ -48,11 +51,21 @@ class sigma_max(Atom):
             A list of SciPy CSC sparse matrices or None.
         """
         # Grad: U diag(e_1) V.T
-        U, s, V = LA.svd(values[0])
-        ds = np.zeros(len(s))
-        ds[0] = 1
-        D = U.dot(np.diag(ds)).dot(V)
-        return [sp.csc_matrix(D.ravel(order='F')).T]
+        if self._is_differentiable_at(values[0]):
+            U, s, V = LA.svd(values[0])
+            ds = np.zeros(len(s))
+            ds[0] = 1
+            D = U.dot(np.diag(ds)).dot(V)
+            return [sp.csc_matrix(D.ravel(order='F')).T]
+        else:
+            raise NotDifferentiableError
+
+    def _is_differentiable_at(self, point: cvxtypes.constant() | cvxtypes.variable()) -> bool:
+        """Checks if the function is differentiable at `point`"""
+        if np.isclose(cp.sigma_max(point).value, 0):
+            return False
+        else:
+            return True
 
     def shape_from_args(self) -> Tuple[int, ...]:
         """Returns the (row, col) shape of the expression.
