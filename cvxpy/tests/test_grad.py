@@ -20,6 +20,7 @@ import numpy as np
 
 import cvxpy as cp
 from cvxpy import Maximize, Minimize, Problem
+from cvxpy.error import NotDifferentiableError
 from cvxpy.expressions.variable import Variable
 from cvxpy.tests.base_test import BaseTest
 from cvxpy.transforms import linearize
@@ -887,3 +888,62 @@ class TestGrad(BaseTest):
         self.x.value = [1, 2]
         val = np.eye(2)
         self.assertItemsAlmostEqual(expr.grad[self.x].toarray(), val)
+
+
+class TestIsDifferentiableAt(BaseTest):
+    def test_sum_largest(self):
+        pass
+
+    def test_sum_smallest(self):
+        pass
+
+    def test_pnorm_bare(self):
+        pass
+
+    def test_atom_max(self):
+        pass
+
+    def test_atom_min(self):
+        pass
+
+    def test_elementwise_max(self):
+        pass
+
+    def test_log_det(self):
+        pass
+
+    def test_lambda_max(self):
+        pass
+
+    def test_lambda_min(self):
+        pass
+
+    def test_abs(self):
+        pass
+
+    def test_mixed_norm(self):
+        pass
+
+    def test_norm_2(self):
+        pass
+
+    def test_norm_1(self):
+        pass
+
+    def test_norm_inf(self):
+        pass
+
+    def test_norm_fro(self):
+        pass
+
+    def test_norm_matrix_1(self):
+        pass
+
+    def test_norm_matrix_inf(self):
+        pass
+
+    def test_norm_matrix_nuc(self):
+        pass
+
+    def test_norm_sigma_max(self):
+        pass

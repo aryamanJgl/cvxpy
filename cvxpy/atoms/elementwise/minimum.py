@@ -17,11 +17,13 @@ import sys
 from typing import Any, List, Tuple
 
 import numpy as np
+import numpy.typing as npt
 from cvxpy.atoms.elementwise.maximum import maximum
 
 from cvxpy.atoms.elementwise.elementwise import Elementwise
 from cvxpy.error import NotDifferentiableError
 from cvxpy.expressions import cvxtypes
+from cvxpy.utilities import scopes
 
 if sys.version_info >= (3, 0):
     from functools import reduce
@@ -95,23 +97,23 @@ class minimum(Elementwise):
         Returns:
             A list of SciPy CSC sparse matrices or None.
         """
-        if self._is_differentiable_at(values[0], values[1]):
-            min_vals = np.array(self.numeric(values))
-            unused = np.array(np.ones(min_vals.shape), dtype=bool)
-            grad_list = []
-            for idx, value in enumerate(values):
-                rows = self.args[idx].size
-                cols = self.size
-                grad_vals = (value == min_vals) & unused
-                # Remove all the min_vals that were used.
-                unused[value == min_vals] = 0
-                grad_list += [minimum.elemwise_grad_to_diag(grad_vals,
-                                                            rows, cols)]
-            return grad_list
-        else:
-            raise NotDifferentiableError
+        if scopes.strict_differentiability_active():
+            if not self._is_differentiable_at(values[0], values[1]):
+                raise NotDifferentiableError
+        min_vals = np.array(self.numeric(values))
+        unused = np.array(np.ones(min_vals.shape), dtype=bool)
+        grad_list = []
+        for idx, value in enumerate(values):
+            rows = self.args[idx].size
+            cols = self.size
+            grad_vals = (value == min_vals) & unused
+            # Remove all the min_vals that were used.
+            unused[value == min_vals] = 0
+            grad_list += [minimum.elemwise_grad_to_diag(grad_vals,
+                                                        rows, cols)]
+        return grad_list
 
-    def _is_differentiable_at(self, point1: cvxtypes.constant() | cvxtypes.variable(),
-                             point2: cvxtypes.constant() | cvxtypes.variable()) -> bool:
+    def _is_differentiable_at(self, point1: cvxtypes.constant() | cvxtypes.variable() | npt.ArrayLike,
+                              point2: cvxtypes.constant() | cvxtypes.variable() | npt.ArrayLike) -> bool:
         """Checks if the function is differentiable at `point`"""
         return maximum(point1, point2)._is_differentiable_at(point1, point2)

@@ -17,6 +17,8 @@ from typing import List, Tuple
 
 import numpy as np
 import cvxpy as cp
+import numpy.typing as npt
+import inspect
 import scipy.sparse as sp
 from scipy import linalg as LA
 
@@ -24,6 +26,7 @@ from cvxpy.atoms.atom import Atom
 from cvxpy.constraints.constraint import Constraint
 from cvxpy.error import NotDifferentiableError
 from cvxpy.expressions import cvxtypes
+from cvxpy.utilities import scopes
 
 
 class lambda_max(Atom):
@@ -57,24 +60,28 @@ class lambda_max(Atom):
         Returns:
             A list of SciPy CSC sparse matrices or None.
         """
-        if self._is_differentiable_at(values[0]):
-            w, v = LA.eigh(values[0])
-            d = np.zeros(w.shape)
-            d[-1] = 1
-            d = np.diag(d)
-            D = v.dot(d).dot(v.T)
-            return [sp.csc_matrix(D.ravel(order='F')).T]
-        else:
-            raise NotDifferentiableError
+        if scopes.strict_differentiability_active():
+            if not self._is_differentiable_at(values[0]):
+                raise NotDifferentiableError
+        w, v = LA.eigh(values[0])
+        d = np.zeros(w.shape)
+        d[-1] = 1
+        d = np.diag(d)
+        D = v.dot(d).dot(v.T)
+        return [sp.csc_matrix(D.ravel(order='F')).T]
 
-    def _is_differentiable_at(self, point: cvxtypes.constant() | cvxtypes.variable()) -> bool:
-        """Checks if the function is differentiable at `point`"""
+    def _is_differentiable_at(self, point: cvxtypes.constant() | cvxtypes.variable() | npt.ArrayLike) -> bool:
+        """Non Differentiable when the largest eigenvalue is repeated"""
+        if isinstance(point, np.ndarray):
+            point = point
+        else:
+            point = point.value
         largest = cp.lambda_max(point)
         second_largest = cp.lambda_sum_largest(point, 2) - largest
-        if np.allclose(largest.value, second_largest.value, rtol=1e8, atol=1e4):
-            return True
-        else:
+        if np.allclose(largest.value, second_largest.value, rtol=1e-8, atol=1e-4):
             return False
+        else:
+            return True
 
     def validate_arguments(self) -> None:
         """Verify that the argument A is square.

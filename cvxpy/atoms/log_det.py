@@ -17,6 +17,7 @@ limitations under the License.
 from typing import List, Tuple
 
 import numpy as np
+import numpy.typing as npt
 
 import scipy.sparse as sp
 from numpy import linalg as LA
@@ -26,6 +27,7 @@ from cvxpy.expressions import cvxtypes
 import cvxpy.settings as s
 from cvxpy.atoms.atom import Atom
 from cvxpy.constraints.constraint import Constraint
+from cvxpy.utilities import scopes
 
 class log_det(Atom):
     """:math:`\\log\\det A`
@@ -96,22 +98,26 @@ class log_det(Atom):
         Returns:
             A list of SciPy CSC sparse matrices or None.
         """
-        if self._is_differentiable_at(values[0]):
-            X = values[0]
-            eigen_val = LA.eigvalsh(X)
-            if np.min(eigen_val) > 0:
-                # Grad: X^{-1}.T
-                D = np.linalg.inv(X).T
-                return [sp.csc_matrix(D.ravel(order='F')).T]
-            # Outside domain.
-            else:
-                return [None]
+        if scopes.strict_differentiability_active():
+            if not self._is_differentiable_at(values[0]):
+                raise NotDifferentiableError
+        X = values[0]
+        eigen_val = LA.eigvalsh(X)
+        if np.min(eigen_val) > 0:
+            # Grad: X^{-1}.T
+            D = np.linalg.inv(X).T
+            return [sp.csc_matrix(D.ravel(order='F')).T]
+        # Outside domain.
         else:
-            raise NotDifferentiableError
+            return [None]
 
-    def _is_differentiable_at(self, point: cvxtypes.constant() | cvxtypes.variable()) -> bool:
-        """Checks if the function is differentiable at `point`"""
-        if np.allclose(np.linalg.det(point.value), 0, atol=1e4, rtol=1e9):
+    def _is_differentiable_at(self, point: cvxtypes.constant() | cvxtypes.variable() | npt.ArrayLike) -> bool:
+        """Non Differentiable when the point is a singular matrix"""
+        if isinstance(point, np.ndarray):
+           mask = np.allclose(np.linalg.det(point), 0, atol=1e-4, rtol=1e-9)
+        else:
+           mask = np.allclose(np.linalg.det(point.value), 0, atol=1e-4, rtol=1e-9)
+        if mask:
             return False
         else:
             return True

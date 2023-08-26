@@ -17,12 +17,14 @@ from typing import List, Tuple
 
 import numpy as np
 import cvxpy as cp
+import numpy.typing as npt
 import scipy.sparse as sp
 
 from cvxpy.atoms.axis_atom import AxisAtom
 from cvxpy.constraints.constraint import Constraint
 from cvxpy.error import NotDifferentiableError
 from cvxpy.expressions import cvxtypes
+from cvxpy.utilities import scopes
 
 
 class norm1(AxisAtom):
@@ -105,18 +107,22 @@ class norm1(AxisAtom):
         Returns:
             A NumPy ndarray matrix or None.
         """
-        if self._is_differentiable_at(value):
-            rows = value.size
-            D_null = sp.csc_matrix((rows, 1), dtype='float64')
-            value = value.reshape((rows, 1))
-            D_null += (value > 0)
-            D_null -= (value < 0)
-            return D_null
-        else:
-            raise NotDifferentiableError
+        if scopes.strict_differentiability_active():
+            if not self._is_differentiable_at(values):
+                raise NotDifferentiableError
+        rows = value.size
+        D_null = sp.csc_matrix((rows, 1), dtype='float64')
+        value = value.reshape((rows, 1))
+        D_null += (value > 0)
+        D_null -= (value < 0)
+        return D_null
 
-    def _is_differentiable_at(self, point: cvxtypes.constant() | cvxtypes.variable()) -> bool:
+    def _is_differentiable_at(self, point: cvxtypes.constant() | cvxtypes.variable() | npt.ArrayLike) -> bool:
         """Checks if the function is differentiable at `point`"""
+        if isinstance(point, np.ndarray):
+            point = point
+        else:
+            point = point.value
         if self.axis is not None:
             axis_norm = cp.norm1(point, axis=self.axis).value,
             if np.allclose(axis_norm, np.zeros_like(axis_norm)):
@@ -124,4 +130,7 @@ class norm1(AxisAtom):
             else:
                 return True
         else:
-           np.isclose(cp.norm1(point).value, 0)
+           if np.isclose(cp.norm1(point).value, 0):
+               return False
+           else:
+               return True

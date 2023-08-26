@@ -17,6 +17,7 @@ from typing import Optional, Tuple
 
 import numpy as np
 import cvxpy as cp
+import numpy.typing as npt
 
 from cvxpy.atoms.atom import Atom
 from cvxpy.atoms.axis_atom import AxisAtom
@@ -83,15 +84,19 @@ class max(AxisAtom):
         else:
             raise NotDifferentiableError
 
-    def _is_differentiable_at(self, point: cvxtypes.constant() | cvxtypes.variable()) -> bool:
-        """Checks if the function is differentiable at `point`"""
+    def _is_differentiable_at(self, point: cvxtypes.constant() | cvxtypes.variable() | npt.ArrayLike) -> bool:
+        """Non Differentiable when there is a repeated maximum"""
+        if isinstance(point, np.ndarray):
+            point_val = point
+        else:
+            point_val = point.value
         if self.axis is not None:
             largest_vector = cp.max(point, axis=self.axis)
-            f = lambda x: np.allclose(largest_vector.value, x.value)
+            f = lambda x: np.allclose(largest_vector.value, x)
             if self.axis == 1:
-                t_value = list(np.apply_along_axis(f, axis=0, arr=point.value))
+                t_value = list(np.apply_along_axis(f, axis=0, arr=point_val))
             else:
-                t_value = list(np.apply_along_axis(f, axis=1, arr=point.value))
+                t_value = list(np.apply_along_axis(f, axis=1, arr=point_val))
             if t_value.count(True) > 1:
                 return False
             else:
@@ -99,10 +104,10 @@ class max(AxisAtom):
         else:
             largest = cp.max(point)
             second_largest = cp.sum_largest(point, 2) - largest
-            if np.allclose(largest.value, second_largest.value, rtol=1e8, atol=1e4):
-                return True
-            else:
+            if np.allclose(largest.value, second_largest.value, rtol=1e-8, atol=1e-4):
                 return False
+            else:
+                return True
 
     def sign_from_args(self) -> Tuple[bool, bool]:
         """Returns sign (is positive, is negative) of the expression.

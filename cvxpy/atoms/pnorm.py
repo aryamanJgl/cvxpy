@@ -25,6 +25,7 @@ from cvxpy.atoms.norm_inf import norm_inf
 from cvxpy.constraints.constraint import Constraint
 from cvxpy.error import NotDifferentiableError
 from cvxpy.expressions import cvxtypes
+from cvxpy.utilities import scopes
 from cvxpy.utilities.power_tools import pow_high, pow_mid, pow_neg
 
 
@@ -248,29 +249,29 @@ class Pnorm(AxisAtom):
         Returns:
             A NumPy ndarray or None.
         """
-        if self._is_differentiable_at(value):
-            rows = value.size
-            # Outside domain.
-            if self.p < 1 and np.any(value <= 0):
-                return None
-            D_null = sp.csc_matrix((rows, 1), dtype='float64')
-            denominator = np.linalg.norm(value, float(self.p))
-            denominator = np.power(denominator, self.p - 1)
-            # Subgrad is 0 when denom is 0 (or undefined).
-            if denominator == 0:
-                if self.p > 1:
-                    return D_null.todense()
-                else:
-                    return None
+        if scopes.strict_differentiability_active():
+            if not self._is_differentiable_at(value):
+                raise NotDifferentiableError
+        rows = value.size
+        # Outside domain.
+        if self.p < 1 and np.any(value <= 0):
+            return None
+        D_null = sp.csc_matrix((rows, 1), dtype='float64')
+        denominator = np.linalg.norm(value, float(self.p))
+        denominator = np.power(denominator, self.p - 1)
+        # Subgrad is 0 when denom is 0 (or undefined).
+        if denominator == 0:
+            if self.p > 1:
+                return D_null.todense()
             else:
-                nominator = np.power(value, self.p - 1)
-                frac = np.divide(nominator, denominator)
-                return np.reshape(frac, (frac.size, 1))
+                return None
         else:
-            raise NotDifferentiableError
+            nominator = np.power(value, self.p - 1)
+            frac = np.divide(nominator, denominator)
+            return np.reshape(frac, (frac.size, 1))
 
     def _is_differentiable_at(self, point: cvxtypes.constant() | cvxtypes.variable()) -> bool:
-        """Checks if the function is differentiable at `point`"""
+        """Non Differentiable at the origin"""
         if self.axis is not None:
             axis_norm = pnorm(point, p=self.p, axis=self.axis, keepdims=self.keepdims).value,
             if np.allclose(axis_norm, np.zeros_like(axis_norm)):
@@ -278,4 +279,7 @@ class Pnorm(AxisAtom):
             else:
                 return True
         else:
-           np.isclose(cp.pnorm(point, p=self.p).value, 0)
+           if np.isclose(cp.pnorm(point, p=self.p).value, 0, rtol=1e-9, atol=1e-4):
+               return False
+           else:
+               return True
