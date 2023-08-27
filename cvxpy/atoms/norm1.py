@@ -16,7 +16,6 @@ limitations under the License.
 from typing import List, Tuple
 
 import numpy as np
-import cvxpy as cp
 import numpy.typing as npt
 import scipy.sparse as sp
 
@@ -108,7 +107,7 @@ class norm1(AxisAtom):
             A NumPy ndarray matrix or None.
         """
         if scopes.strict_differentiability_active():
-            if not self._is_differentiable_at(values):
+            if not self._is_differentiable_at(value):
                 raise NotDifferentiableError
         rows = value.size
         D_null = sp.csc_matrix((rows, 1), dtype='float64')
@@ -123,14 +122,7 @@ class norm1(AxisAtom):
             point = point
         else:
             point = point.value
-        if self.axis is not None:
-            axis_norm = cp.norm1(point, axis=self.axis).value,
-            if np.allclose(axis_norm, np.zeros_like(axis_norm)):
-                return False
-            else:
-                return True
+        if np.isclose(np.linalg.norm(point, 1), 0):
+            return False
         else:
-           if np.isclose(cp.norm1(point).value, 0):
-               return False
-           else:
-               return True
+            return True

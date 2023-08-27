@@ -17,6 +17,7 @@ limitations under the License.
 from typing import Tuple
 
 import numpy as np
+import numpy.typing as npt
 import cvxpy as cp
 import scipy.sparse as sp
 from numpy import linalg as LA
@@ -24,6 +25,7 @@ from numpy import linalg as LA
 from cvxpy.atoms.atom import Atom
 from cvxpy.error import NotDifferentiableError
 from cvxpy.expressions import cvxtypes
+from cvxpy.utilities import scopes
 
 
 class sigma_max(Atom):
@@ -51,18 +53,22 @@ class sigma_max(Atom):
             A list of SciPy CSC sparse matrices or None.
         """
         # Grad: U diag(e_1) V.T
-        if self._is_differentiable_at(values[0]):
-            U, s, V = LA.svd(values[0])
-            ds = np.zeros(len(s))
-            ds[0] = 1
-            D = U.dot(np.diag(ds)).dot(V)
-            return [sp.csc_matrix(D.ravel(order='F')).T]
-        else:
-            raise NotDifferentiableError
+        if scopes.strict_differentiability_active():
+            if not self._is_differentiable_at(values[0]):
+                raise NotDifferentiableError
+        U, s, V = LA.svd(values[0])
+        ds = np.zeros(len(s))
+        ds[0] = 1
+        D = U.dot(np.diag(ds)).dot(V)
+        return [sp.csc_matrix(D.ravel(order='F')).T]
 
-    def _is_differentiable_at(self, point: cvxtypes.constant() | cvxtypes.variable()) -> bool:
+    def _is_differentiable_at(self, point: cvxtypes.constant() | cvxtypes.variable() | npt.ArrayLike) -> bool:
         """Checks if the function is differentiable at `point`"""
-        if np.isclose(cp.sigma_max(point).value, 0):
+        if isinstance(point, np.ndarray):
+            point = point
+        else:
+            point = point.value
+        if np.isclose(LA.norm(point, 2), 0):
             return False
         else:
             return True

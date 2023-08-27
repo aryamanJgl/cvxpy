@@ -16,6 +16,11 @@ limitations under the License.
 from typing import Optional, Tuple
 
 import numpy as np
+import numpy.typing as npt
+import cvxpy as cp
+from cvxpy.error import NotDifferentiableError
+
+from cvxpy.utilities import scopes
 
 from cvxpy.atoms.atom import Atom
 from cvxpy.atoms.axis_atom import AxisAtom
@@ -72,11 +77,27 @@ class min(AxisAtom):
             A NumPy ndarray or None.
         """
         # Grad: 1 for a largest index.
+        if scopes.strict_differentiability_active():
+            if not self._is_differentiable_at(value):
+                raise NotDifferentiableError
         value = np.array(value).ravel(order='F')
         idx = np.argmin(value)
         D = np.zeros((value.size, 1))
         D[idx] = 1
         return D
+
+    def _is_differentiable_at(self, point: cvxtypes.constant() | cvxtypes.variable() | npt.ArrayLike) -> bool:
+        """Non-Differentiable in the case of a repeated maximum"""
+        if isinstance(point, np.ndarray):
+            point = point
+        else:
+            point = point.value
+        smallest_value = point.flatten().min()
+        second_smallest_value = cp.sum_smallest(point, 2).value - smallest_value
+        if np.isclose(smallest_value, second_smallest_value, rtol=1e-8, atol=1e-4):
+            return False
+        else:
+            return True
 
     def sign_from_args(self) -> Tuple[bool, bool]:
         """Returns sign (is positive, is negative) of the expression.

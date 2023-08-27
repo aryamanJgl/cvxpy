@@ -23,6 +23,7 @@ from cvxpy.atoms.atom import Atom
 from cvxpy.atoms.axis_atom import AxisAtom
 from cvxpy.error import NotDifferentiableError
 from cvxpy.expressions import cvxtypes
+from cvxpy.utilities import scopes
 
 
 class max(AxisAtom):
@@ -75,39 +76,27 @@ class max(AxisAtom):
             A NumPy ndarray or None.
         """
         # Grad: 1 for a largest index.
-        if self._is_differentiable_at(value):
-            value = np.array(value).ravel(order='F')
-            idx = np.argmax(value)
-            D = np.zeros((value.size, 1))
-            D[idx] = 1
-            return D
-        else:
-            raise NotDifferentiableError
+        if scopes.strict_differentiability_active():
+            if not self._is_differentiable_at(value):
+                raise NotDifferentiableError
+        value = np.array(value).ravel(order='F')
+        idx = np.argmax(value)
+        D = np.zeros((value.size, 1))
+        D[idx] = 1
+        return D
 
     def _is_differentiable_at(self, point: cvxtypes.constant() | cvxtypes.variable() | npt.ArrayLike) -> bool:
-        """Non Differentiable when there is a repeated maximum"""
+        """Non-Differentiable in the case of a repeated maximum"""
         if isinstance(point, np.ndarray):
-            point_val = point
+            point = point
         else:
-            point_val = point.value
-        if self.axis is not None:
-            largest_vector = cp.max(point, axis=self.axis)
-            f = lambda x: np.allclose(largest_vector.value, x)
-            if self.axis == 1:
-                t_value = list(np.apply_along_axis(f, axis=0, arr=point_val))
-            else:
-                t_value = list(np.apply_along_axis(f, axis=1, arr=point_val))
-            if t_value.count(True) > 1:
-                return False
-            else:
-                return True
+            point = point.value
+        largest_value = point.flatten().max()
+        second_largest_value = cp.sum_largest(point, 2).value - largest_value
+        if np.isclose(largest_value, second_largest_value, rtol=1e-8, atol=1e-4):
+            return False
         else:
-            largest = cp.max(point)
-            second_largest = cp.sum_largest(point, 2) - largest
-            if np.allclose(largest.value, second_largest.value, rtol=1e-8, atol=1e-4):
-                return False
-            else:
-                return True
+            return True
 
     def sign_from_args(self) -> Tuple[bool, bool]:
         """Returns sign (is positive, is negative) of the expression.
