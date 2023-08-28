@@ -924,16 +924,22 @@ class TestIsDifferentiableAt(BaseTest):
         self.scoped_grad_test(expr)
 
     def test_pnorm_bare(self):
-        #TODO: `AxisAtom`s are not working properly yet
-        pass
+        self.x.value = np.array([0, 0])
+        expr = cp.pnorm(self.x, 2)
+        self.scoped_grad_test(expr)
 
     def test_atom_max(self):
-        #TODO: `AxisAtom`s are not working properly yet
-        pass
+        self.A.value = np.array([[33, 2],
+                                 [33, 12]])
+        expr = cp.max(self.A)
+        self.scoped_grad_test(expr)
 
     def test_atom_min(self):
-        #TODO: `AxisAtom`s are not working properly yet
-        pass
+        #BUG: Cannot identify repeated smallest element
+        self.A.value = np.array([[2, 2],
+                                 [33, 12]])
+        expr = cp.max(self.A)
+        self.scoped_grad_test(expr)
 
     def test_elementwise_max(self):
         self.x.value = np.array([100, 12])
@@ -966,15 +972,12 @@ class TestIsDifferentiableAt(BaseTest):
         self.scoped_grad_test(expr)
 
     def test_mixed_norm(self):
-        #TODO: `AxisAtom`s are not working properly yet
         pass
 
     def test_norm_1(self):
-        #TODO: `AxisAtom`s are not working properly yet
         pass
 
     def test_norm_inf(self):
-        #TODO: `AxisAtom`s are not working properly yet
         pass
 
     def test_norm_fro(self):

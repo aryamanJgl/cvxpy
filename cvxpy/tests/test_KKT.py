@@ -49,16 +49,7 @@ class TestKKT_QPs(BaseTest):
 
 class TestKKT_SOCPs(BaseTest):
 
-    #BUG: STH.socp_0 does not have a differentiable objective
-    # def test_socp_0(self, places=4):
-    #     sth = STH.socp_0()
-    #     sth.solve(solver='ECOS')
-    #     sth.check_primal_feasibility(places)
-    #     sth.check_complementarity(places)
-    #     sth.check_dual_domains(places)
-    #     sth.check_stationary_lagrangian(places)
-    #     return sth
-
+    #NOTE: STH.socp_0 does not have a differentiable objective
     def test_socp_1(self, places=4):
         sth = STH.socp_1()
         sth.solve(solver='ECOS')
