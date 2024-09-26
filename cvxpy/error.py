@@ -60,3 +60,7 @@ class DQCPError(Exception):
 class ParameterError(Exception):
     """Error thrown for accessing the value of an unspecified parameter.
     """
+
+class NotDifferentiableError(Exception):
+    """Error thrown when the atom is not differentiable at the given point
+    """

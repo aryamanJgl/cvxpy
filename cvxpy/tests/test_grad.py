@@ -20,10 +20,12 @@ import numpy as np
 
 import cvxpy as cp
 from cvxpy import Maximize, Minimize, Problem
+from cvxpy.error import NotDifferentiableError
 from cvxpy.expressions.variable import Variable
 from cvxpy.tests.base_test import BaseTest
 from cvxpy.transforms import linearize
 from cvxpy.transforms.partial_optimize import partial_optimize
+from cvxpy.utilities import scopes
 
 
 class TestGrad(BaseTest):
@@ -887,3 +889,108 @@ class TestGrad(BaseTest):
         self.x.value = [1, 2]
         val = np.eye(2)
         self.assertItemsAlmostEqual(expr.grad[self.x].toarray(), val)
+
+
+class TestIsDifferentiableAt(BaseTest):
+    """Unit tests for the `_is_differentiable_at` and `strict_differentiability_scope`
+    features"""
+
+    def setUp(self) -> None:
+        self.a = Variable(name='a')
+
+        self.x = Variable(2, name='x')
+        self.y = Variable(2, name='y')
+
+        self.A = Variable((2, 2), name='A')
+        self.B = Variable((2, 2), name='B')
+        self.C = Variable((3, 2), name='C')
+
+    def scoped_grad_test(self, expr):
+        with scopes.strict_differentiability_scope():
+            with self.assertRaises(NotDifferentiableError):
+                expr.grad
+
+    def test_sum_largest(self):
+        self.A.value = np.array([[12, 12],
+                                 [8, 9]])
+        expr = cp.sum_largest(self.A, 2)
+        self.scoped_grad_test(expr)
+
+    def test_sum_smallest(self):
+        #BUG: Not able to test for `k` smallest elements
+        self.A.value = np.array([[12, 12],
+                                 [123, 223]])
+        expr = cp.sum_largest(self.A, 2)
+        self.scoped_grad_test(expr)
+
+    def test_pnorm_bare(self):
+        self.x.value = np.array([0, 0])
+        expr = cp.pnorm(self.x, 2)
+        self.scoped_grad_test(expr)
+
+    def test_atom_max(self):
+        self.A.value = np.array([[33, 2],
+                                 [33, 12]])
+        expr = cp.max(self.A)
+        self.scoped_grad_test(expr)
+
+    def test_atom_min(self):
+        #BUG: Cannot identify repeated smallest element
+        self.A.value = np.array([[2, 2],
+                                 [33, 12]])
+        expr = cp.max(self.A)
+        self.scoped_grad_test(expr)
+
+    def test_elementwise_max(self):
+        self.x.value = np.array([100, 12])
+        self.y.value = np.array([200, 12])
+        expr = cp.maximum(self.x, self.y)
+        self.scoped_grad_test(expr)
+
+    def test_log_det(self):
+        self.A.value = np.array([[2,8],
+                                 [1,4]])
+        expr = cp.log_det(self.A)
+        self.scoped_grad_test(expr)
+
+    def test_lambda_max(self):
+        self.A.value = np.array([[1, 0],
+                                 [0, 1]])
+        expr = cp.lambda_max(self.A)
+        self.scoped_grad_test(expr)
+
+    def test_lambda_min(self):
+        self.A.value = np.array([[1, 0],
+                                 [0, 1]])
+        expr = cp.lambda_max(self.A)
+        self.scoped_grad_test(expr)
+        pass
+
+    def test_abs(self):
+        self.x.value = np.array([100, 0.00000000001])
+        expr = cp.abs (self.x)
+        self.scoped_grad_test(expr)
+
+    def test_mixed_norm(self):
+        pass
+
+    def test_norm_1(self):
+        pass
+
+    def test_norm_inf(self):
+        pass
+
+    def test_norm_fro(self):
+        pass
+
+    def test_norm_matrix_1(self):
+        pass
+
+    def test_norm_matrix_inf(self):
+        pass
+
+    def test_norm_matrix_nuc(self):
+        pass
+
+    def test_norm_sigma_max(self):
+        pass

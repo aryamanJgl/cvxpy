@@ -17,6 +17,7 @@ import contextlib
 from typing import Generator
 
 _dpp_scope_active = False
+_strict_differentiability_active = False
 
 
 @contextlib.contextmanager
@@ -47,3 +48,30 @@ def dpp_scope() -> Generator[None, None, None]:
 def dpp_scope_active() -> bool:
     """Returns True if a `dpp_scope` is active. """
     return _dpp_scope_active
+
+
+@contextlib.contextmanager
+def strict_differentiability_scope() -> Generator[None, None, None]:
+    """Context Manager for imposing strict differentiability when performing
+    KKT checks. Using this context manager ensures that whenever `grad` calls are
+    made within this context manager, we always check if the subgradient at the point
+    of interest is unique or not. In case it isn't, we raise a NotDifferentiableError()
+
+    ```
+        x = cp.Variable()
+        x.value = 0
+        expr = norm(x)
+        expr.grad # does not raise an error
+        with strict_differentiability():
+            expr.grad # will raise a NotDifferentiableError
+    ```
+    """
+    global _strict_differentiability_active
+    prev_state = _strict_differentiability_active
+    _strict_differentiability_active = True
+    yield
+    _strict_differentiability_active = prev_state
+
+def strict_differentiability_active() -> bool:
+    """Returns `True` if a `strict_differentiability_scope` is active"""
+    return _strict_differentiability_active

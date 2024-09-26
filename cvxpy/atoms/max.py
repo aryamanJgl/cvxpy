@@ -16,10 +16,14 @@ limitations under the License.
 from typing import Optional, Tuple
 
 import numpy as np
+import cvxpy as cp
+import numpy.typing as npt
 
 from cvxpy.atoms.atom import Atom
 from cvxpy.atoms.axis_atom import AxisAtom
+from cvxpy.error import NotDifferentiableError
 from cvxpy.expressions import cvxtypes
+from cvxpy.utilities import scopes
 
 
 class max(AxisAtom):
@@ -72,11 +76,27 @@ class max(AxisAtom):
             A NumPy ndarray or None.
         """
         # Grad: 1 for a largest index.
+        if scopes.strict_differentiability_active():
+            if not self._is_differentiable_at(value):
+                raise NotDifferentiableError
         value = np.array(value).ravel(order='F')
         idx = np.argmax(value)
         D = np.zeros((value.size, 1))
         D[idx] = 1
         return D
+
+    def _is_differentiable_at(self, point: cvxtypes.constant() | cvxtypes.variable() | npt.ArrayLike) -> bool:
+        """Non-Differentiable in the case of a repeated maximum"""
+        if isinstance(point, np.ndarray):
+            point = point
+        else:
+            point = point.value
+        largest_value = point.flatten().max()
+        second_largest_value = cp.sum_largest(point, 2).value - largest_value
+        if np.isclose(largest_value, second_largest_value, rtol=1e-8, atol=1e-4):
+            return False
+        else:
+            return True
 
     def sign_from_args(self) -> Tuple[bool, bool]:
         """Returns sign (is positive, is negative) of the expression.

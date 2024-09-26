@@ -17,8 +17,13 @@ import sys
 from typing import Any, List, Tuple
 
 import numpy as np
+import numpy.typing as npt
+from cvxpy.atoms.elementwise.maximum import maximum
 
 from cvxpy.atoms.elementwise.elementwise import Elementwise
+from cvxpy.error import NotDifferentiableError
+from cvxpy.expressions import cvxtypes
+from cvxpy.utilities import scopes
 
 if sys.version_info >= (3, 0):
     from functools import reduce
@@ -92,6 +97,9 @@ class minimum(Elementwise):
         Returns:
             A list of SciPy CSC sparse matrices or None.
         """
+        if scopes.strict_differentiability_active():
+            if not self._is_differentiable_at(values[0], values[1]):
+                raise NotDifferentiableError
         min_vals = np.array(self.numeric(values))
         unused = np.array(np.ones(min_vals.shape), dtype=bool)
         grad_list = []
@@ -104,3 +112,8 @@ class minimum(Elementwise):
             grad_list += [minimum.elemwise_grad_to_diag(grad_vals,
                                                         rows, cols)]
         return grad_list
+
+    def _is_differentiable_at(self, point1: cvxtypes.constant() | cvxtypes.variable() | npt.ArrayLike,
+                              point2: cvxtypes.constant() | cvxtypes.variable() | npt.ArrayLike) -> bool:
+        """Checks if the function is differentiable at `point`"""
+        return maximum(point1, point2)._is_differentiable_at(point1, point2)

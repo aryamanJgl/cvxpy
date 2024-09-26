@@ -17,10 +17,14 @@ limitations under the License.
 from typing import Tuple
 
 import numpy as np
+import numpy.typing as npt
 import scipy.sparse as sp
+from cvxpy.error import NotDifferentiableError
+from cvxpy.expressions import cvxtypes
 
 import cvxpy.interface as intf
 from cvxpy.atoms.atom import Atom
+from cvxpy.utilities import scopes
 
 
 class sum_largest(Atom):
@@ -57,11 +61,27 @@ class sum_largest(Atom):
             A list of SciPy CSC sparse matrices or None.
         """
         # Grad: 1 for each of k largest indices.
+        if scopes.strict_differentiability_active():
+            if not self._is_differentiable_at(values[0]):
+                raise NotDifferentiableError
         value = intf.from_2D_to_1D(values[0].flatten().T)
         indices = np.argsort(-value)[:int(self.k)]
         D = np.zeros((self.args[0].shape[0]*self.args[0].shape[1], 1))
         D[indices] = 1
         return [sp.csc_matrix(D)]
+
+    def _is_differentiable_at(self, point: cvxtypes.constant() | cvxtypes.variable() | npt.ArrayLike) -> bool:
+        """Non-Differentiable if the top-k elements have repeats"""
+        if isinstance(point, np.ndarray):
+            point_top_k = -np.sort(-point.flatten())[: self.k]
+        else:
+            point_top_k = -np.sort(-point.flatten().value)[: self.k]
+        #HACK: does not perform a proper comparison for floating point entries, should move to a solution
+        #that does
+        if len(point_top_k) != len(set(point_top_k)):
+            return False
+        else:
+            return True
 
     def shape_from_args(self) -> Tuple[int, ...]:
         """Returns the (row, col) shape of the expression.

@@ -16,12 +16,16 @@ limitations under the License.
 from typing import List, Tuple, Union
 
 import numpy as np
+import numpy.typing as npt
 import scipy.sparse as sp
 
 from cvxpy.atoms.axis_atom import AxisAtom
 from cvxpy.atoms.norm1 import norm1
 from cvxpy.atoms.norm_inf import norm_inf
 from cvxpy.constraints.constraint import Constraint
+from cvxpy.error import NotDifferentiableError
+from cvxpy.expressions import cvxtypes
+from cvxpy.utilities import scopes
 from cvxpy.utilities.power_tools import pow_high, pow_mid, pow_neg
 
 
@@ -42,6 +46,7 @@ def pnorm(x, p: Union[int, str] = 2, axis=None, keepdims: bool = False, max_deno
     if p == 1:
         return norm1(x, axis=axis, keepdims=keepdims)
     elif p in [np.inf, 'inf', 'Inf']:
+        #NOTE: `grad` has not been implemented for `norm_inf`
         return norm_inf(x, axis=axis, keepdims=keepdims)
     else:
         return Pnorm(x, p=p, axis=axis, keepdims=keepdims, max_denom=max_denom)
@@ -245,6 +250,9 @@ class Pnorm(AxisAtom):
         Returns:
             A NumPy ndarray or None.
         """
+        if scopes.strict_differentiability_active():
+            if not self._is_differentiable_at(value):
+                raise NotDifferentiableError
         rows = value.size
         # Outside domain.
         if self.p < 1 and np.any(value <= 0):
@@ -262,3 +270,17 @@ class Pnorm(AxisAtom):
             nominator = np.power(value, self.p - 1)
             frac = np.divide(nominator, denominator)
             return np.reshape(frac, (frac.size, 1))
+
+    def _is_differentiable_at(self, point: cvxtypes.constant() | cvxtypes.variable() | npt.ArrayLike) -> bool:
+        """Non Differentiable at the origin"""
+        #NOTE: The constraint that pnorms aren't supported with axis arguments still holds. See `validate_arguments`
+        if isinstance(point, np.ndarray):
+            point = point
+        else:
+            point = point.value
+        #NOTE: This would work in the case an axis argument is passed, but if `point` is a matrix, then this will fail
+        # because numpy does not support the computation of matrix norms other than the usual Frobenius norm
+        if np.isclose(np.linalg.norm(point, float(self.p)), 0):
+            return False
+        else:
+            return True

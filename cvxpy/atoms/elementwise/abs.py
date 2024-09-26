@@ -17,6 +17,11 @@ limitations under the License.
 from typing import Tuple
 
 import numpy as np
+import numpy.typing as npt
+from cvxpy.error import NotDifferentiableError
+
+from cvxpy.expressions import cvxtypes
+from cvxpy.utilities import scopes
 
 from .elementwise import Elementwise
 
@@ -77,9 +82,24 @@ class abs(Elementwise):
             A list of SciPy CSC sparse matrices or None.
         """
         # Grad: +1 if positive, -1 if negative.
+        if scopes.strict_differentiability_active():
+            if not self._is_differentiable_at(values[0]):
+                raise NotDifferentiableError
         rows = self.expr.size
         cols = self.size
         D = np.zeros(self.expr.shape)
         D += (values[0] > 0)
         D -= (values[0] < 0)
         return [abs.elemwise_grad_to_diag(D, rows, cols)]
+
+    def _is_differentiable_at(self, point: cvxtypes.constant() | cvxtypes.variable() | npt.ArrayLike) -> bool:
+        """Non Differentiable at `point` if any of the elements of the vector is """
+        if isinstance(point, np.ndarray):
+            point_val = point
+        else:
+            point_val = point.value
+        f = lambda x: np.isclose(0, x, rtol=1e-9, atol=1e-4)
+        if np.any(f(point_val)):
+            return False
+        else:
+            return True

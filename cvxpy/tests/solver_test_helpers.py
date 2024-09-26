@@ -19,6 +19,7 @@ import numpy as np
 
 import cvxpy as cp
 from cvxpy.tests.base_test import BaseTest
+from cvxpy.utilities import scopes
 
 
 class SolverTestHelper:
@@ -144,7 +145,8 @@ class SolverTestHelper:
             else:
                 raise NotImplementedError()
         try:
-            g = L.grad
+            with scopes.strict_differentiability_scope():
+                g = L.grad
         except TypeError as e:
             assert 'is not subscriptable' in str(e)
             msg = """\n
